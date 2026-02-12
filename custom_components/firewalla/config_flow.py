@@ -100,9 +100,11 @@ class FirewallaConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 class FirewallaOptionsFlowHandler(config_entries.OptionsFlow):
     """Handle Firewalla options."""
 
-    def __init__(self, config_entry):
+    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         """Initialize options flow."""
-        self.config_entry = config_entry
+        # Pass the config_entry to the parent class
+        super().__init__(config_entry)
+        # REMOVE this line: self.config_entry = config_entry 
 
     async def async_step_init(self, user_input=None):
         """Manage the options."""
@@ -119,6 +121,19 @@ class FirewallaOptionsFlowHandler(config_entries.OptionsFlow):
                             CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
                         ),
                     ): int,
+                    # Add your other toggles here so they show up in the Options UI!
+                    vol.Optional(
+                        CONF_ENABLE_FLOWS,
+                        default=self.config_entry.options.get(CONF_ENABLE_FLOWS, False),
+                    ): bool,
+                    vol.Optional(
+                        CONF_ENABLE_TRAFFIC,
+                        default=self.config_entry.options.get(CONF_ENABLE_TRAFFIC, False),
+                    ): bool,
+                    vol.Optional(
+                        CONF_ENABLE_ALARMS,
+                        default=self.config_entry.options.get(CONF_ENABLE_ALARMS, False),
+                    ): bool,
                 }
             ),
         )
