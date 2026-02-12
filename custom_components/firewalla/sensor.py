@@ -591,7 +591,7 @@ class FirewallaRecentAlarmsSensor(CoordinatorEntity, SensorEntity):
         super().__init__(coordinator)
         # Defining these in __init__ prevents the 'unnamed_device' error
         self._attr_name = "Firewalla Recent Alarms"
-        self._attr_unique_id = f"{DOMAIN}_recent_alarms_summary_global"
+        self._attr_unique_id = f"{DOMAIN}_recent_alarms_summary_global_v2"
         self._attr_icon = "mdi:shield-alert"
         
         # This links the sensor to your Firewalla Box in the UI
