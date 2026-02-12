@@ -2,7 +2,7 @@
 from typing import Final
 
 DOMAIN: Final = "firewalla"
-PLATFORMS: Final = ["binary_sensor", "sensor"]
+PLATFORMS: Final = ["sensor", "binary_sensor", "device_tracker"]
 
 # Configuration constants
 CONF_API_TOKEN: Final = "api_token"
