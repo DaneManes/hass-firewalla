@@ -8,6 +8,9 @@ PLATFORMS: Final = ["binary_sensor", "sensor"]
 CONF_API_TOKEN: Final = "api_token"
 CONF_SUBDOMAIN: Final = "subdomain"
 CONF_SCAN_INTERVAL: Final = "scan_interval"
+CONF_ENABLE_ALARMS: Final = "false"
+CONF_ENABLE_RULES: Final = "false"
+CONF_ENABLE_FLOWS: Final = "false"
 
 # Default values
 DEFAULT_SUBDOMAIN: Final = "api"
