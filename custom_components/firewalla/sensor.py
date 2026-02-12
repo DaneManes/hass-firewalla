@@ -93,6 +93,12 @@ async def async_setup_entry(
                         for flow in device_flows[target_id]:
                             entities.append(FirewallaFlowSensor(coordinator, flow, device))
     
+                # --- OPTIONAL: Alarm Sensors ---
+                if enable_alarms and coordinator.data and "alarms" in coordinator.data:
+                    _LOGGER.debug("Alarm sensors are enabled, processing data...")
+                    # Option A: One global sensor for all alarms
+                    entities.append(FirewallaRecentAlarmsSensor(coordinator))
+    
     # 4. Add Standalone Flows (flows not tied to a specific device)
     if enable_flows and coordinator.data and "flows" in coordinator.data:
         standalone_count = 0
@@ -576,3 +582,30 @@ class FirewallaFlowSensor(CoordinatorEntity, SensorEntity):
             except Exception as e:
                 _LOGGER.debug("Error converting timestamp: %s", e)
 
+class FirewallaRecentAlarmsSensor(CoordinatorEntity, SensorEntity):
+    """Sensor that summarizes recent Firewalla security alarms."""
+
+    def __init__(self, coordinator):
+        super().__init__(coordinator)
+        self._attr_name = "Firewalla Recent Alarms"
+        self._attr_unique_id = f"{DOMAIN}_recent_alarms_global"
+        self._attr_icon = "mdi:shield-alert"
+
+    @property
+    def native_value(self):
+        """Return the most recent alarm message."""
+        alarms = self.coordinator.data.get("alarms", [])
+        if not alarms:
+            return "No Alarms"
+        # Get the 'msg' or 'type' from the first alarm in the list
+        latest = alarms[0]
+        return latest.get("msg", latest.get("type", "Unknown Event"))
+
+    @property
+    def extra_state_attributes(self):
+        """Store the list of recent alarms in attributes."""
+        alarms = self.coordinator.data.get("alarms", [])
+        return {
+            "total_alarms": len(alarms),
+            "recent_events": alarms[:10] # Keep only the 10 most recent to save memory
+        }
