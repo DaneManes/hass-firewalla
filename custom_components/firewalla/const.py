@@ -2,6 +2,7 @@
 from typing import Final
 
 DOMAIN: Final = "firewalla"
+BRAND: Final = "Firewalla"
 PLATFORMS: Final = ["sensor", "binary_sensor", "device_tracker"]
 
 # Configuration constants
