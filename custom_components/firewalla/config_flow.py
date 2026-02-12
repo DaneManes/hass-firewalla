@@ -4,6 +4,7 @@ import voluptuous as vol
 
 from homeassistant import config_entries
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.selector import BooleanSelector
 import homeassistant.helpers.config_validation as cv
 from homeassistant.const import CONF_SCAN_INTERVAL
 
@@ -79,6 +80,10 @@ class FirewallaConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Required(CONF_SUBDOMAIN, default=default_values[CONF_SUBDOMAIN]): str,
                     vol.Required(CONF_API_TOKEN): str,
                     vol.Required(CONF_SCAN_INTERVAL, default=default_values[CONF_SCAN_INTERVAL]): int,
+                    # Adding the toggles:
+                    vol.Optional(CONF_ENABLE_ALARMS, default=False): bool,
+                    vol.Optional(CONF_ENABLE_RULES, default=False): bool,
+                    vol.Optional(CONF_ENABLE_FLOWS, default=False): bool,
                 }
             ),
             errors=errors,
