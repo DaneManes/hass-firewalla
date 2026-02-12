@@ -356,44 +356,7 @@ class FirewallaApiClient:
             return []
 
     async def get_flows(self) -> List[Dict[str, Any]]:
-        """Get all flows."""
-        flows = []
-        try:
-            # Get the flows from the API
-            flows_response = await self._api_request("GET", "flows")
-            
-            if not flows_response:
-                _LOGGER.warning("No flows found or endpoint not available")
-                return []
-            
-            # Check if the response is a dictionary with a 'results' key
-            if isinstance(flows_response, dict) and "results" in flows_response:
-                flows = flows_response["results"]
-                _LOGGER.debug("Extracted flows from 'results' key")
-            else:
-                flows = flows_response
-                
-            # Check if flows is a list
-            if not isinstance(flows, list):
-                _LOGGER.warning("Flows data is not a list: %s", flows)
-                return []
-                
-            # Process flows to ensure they have an id
-            processed_flows = []
-            for flow in flows:
-                if isinstance(flow, dict):
-                    # Generate a unique ID for the flow if it doesn't have one
-                    if "id" not in flow:
-                        # Use source and destination if available
-                        src_id = flow.get("source", {}).get("id", "unknown")
-                        dst_id = flow.get("destination", {}).get("id", "unknown")
-                        ts = flow.get("ts", "")
-                        flow["id"] = f"flow_{src_id}_{dst_id}_{ts}"
-                
-                processed_flows.append(flow)
-        
-            _LOGGER.debug("Retrieved a total of %s flows", len(processed_flows))
-            return processed_flows
+            return []
             
         except Exception as exc:
             _LOGGER.warning("Error getting flows (endpoint may not be available): %s", exc)
