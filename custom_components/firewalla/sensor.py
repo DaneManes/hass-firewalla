@@ -589,15 +589,15 @@ class FirewallaRecentAlarmsSensor(CoordinatorEntity, SensorEntity):
     @property
     def native_value(self):
         """Return the most recent alarm message."""
-        # 1. Safely get the alarms list, defaulting to an empty list if None
-        alarms = self.coordinator.data.get("alarms", []) if self.coordinator.data else []
+        # 1. Safely retrieve the data
+        data = self.coordinator.data.get("alarms", []) if self.coordinator.data else []
         
-        # 2. GUARD: If the list is empty (initial boot or no alarms), return a safe string
-        if not alarms:
+        # 2. GUARD: Only proceed if we have a non-empty LIST
+        if not isinstance(data, list) or not data:
             return "No Alarms"
             
-        # 3. Now it is safe to access the first item
-        latest = alarms[0]
+        # 3. Safe to access index 0 now
+        latest = data[0]
         
-        # 4. Use .get() for keys to prevent further KeyErrors if the API format shifts
+        # 4. Check for 'message' (common) or 'msg'
         return latest.get("message", latest.get("msg", latest.get("type", "Unknown Event")))
