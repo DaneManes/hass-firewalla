@@ -94,7 +94,7 @@ class FirewallaConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     @staticmethod
     def async_get_options_flow(config_entry):
         """Get the options flow for this handler."""
-        return FirewallaOptionsFlowHandler(config_entry)
+        return FirewallaOptionsFlowHandler()
 
 class FirewallaOptionsFlowHandler(config_entries.OptionsFlow):
     """Handle Firewalla options."""
