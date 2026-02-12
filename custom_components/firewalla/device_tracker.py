@@ -33,14 +33,21 @@ class FirewallaDeviceTracker(CoordinatorEntity, ScannerEntity):
         self.device_id = device["id"]
         self._attr_name = device.get("name", f"Firewalla Device {self.device_id}")
         
-        # Link to the main Firewalla Box device
-        if coordinator.data and "boxes" in coordinator.data:
+        # Get the Box ID from the coordinator data
+        # We use a fallback 'firewalla_hub' if the boxes list is missing
+        box_id = "firewalla_hub"
+        if coordinator.data.get("boxes"):
             box_id = coordinator.data["boxes"][0].get("id")
-            self._attr_device_info = DeviceInfo(
-                identifiers={(DOMAIN, f"box_{box_id}")},
-                name="Firewalla Box",
-                manufacturer="Firewalla",
-            )
+
+        # This DeviceInfo block must be IDENTICAL for all entities 
+        # you want grouped into one single Device card.
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, f"box_{box_id}")},
+            name="Firewalla Box",
+            manufacturer="Firewalla",
+            model="Firewalla Purple", # Optional: can pull from API
+            configuration_url="https://my.firewalla.com",
+        )
 
     @property
     def unique_id(self) -> str:
