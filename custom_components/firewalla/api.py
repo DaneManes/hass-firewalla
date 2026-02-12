@@ -356,9 +356,11 @@ class FirewallaApiClient:
             return []
 
     async def get_flows(self) -> List[Dict[str, Any]]:
+        """Get all flows - DISABLED."""
+        try:
+            _LOGGER.debug("Skipping flows to prevent entity bloat")
             return []
-            
         except Exception as exc:
-            _LOGGER.warning("Error getting flows (endpoint may not be available): %s", exc)
+            _LOGGER.warning("Error getting flows: %s", exc)
             return []
 
