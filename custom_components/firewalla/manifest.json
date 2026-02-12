@@ -1,15 +1,11 @@
 {
-    "domain": "firewalla",
-    "name": "Firewalla",
-    "config_flow": true,
-    "documentation": "https://github.com/blueharford/hass-firewalla",
-    "issue_tracker": "https://github.com/blueharford/hass-firewalla/issues",
-    "requirements": [],
-    "dependencies": [],
-    "codeowners": ["@blueharford"],
-    "iot_class": "cloud_polling",
-    "version": "1.1.1",
-    "logo": "custom_components/firewalla/icon.png"
-  }
+  "domain": "firewalla",
+  "name": "Firewalla",
+  "documentation": "https://github.com/DaneManes/hass-firewalla",
+  "iot_class": "cloud_polling",
+  "codeowners": ["@DaneManes"],
+  "version": "1.0.0"
+  "logo": "custom_components/firewalla/icon.png"
+}
   
   
