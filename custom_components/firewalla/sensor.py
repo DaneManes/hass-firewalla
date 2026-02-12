@@ -586,24 +586,42 @@ class FirewallaFlowSensor(CoordinatorEntity, SensorEntity):
 class FirewallaRecentAlarmsSensor(CoordinatorEntity, SensorEntity):
     """Sensor that summarizes recent Firewalla security alarms."""
 
+    def __init__(self, coordinator):
+        """Initialize the sensor."""
+        super().__init__(coordinator)
+        # Defining these in __init__ prevents the 'unnamed_device' error
+        self._attr_name = "Firewalla Recent Alarms"
+        self._attr_unique_id = f"{DOMAIN}_recent_alarms_summary_global"
+        self._attr_icon = "mdi:shield-alert"
+        
+        # This links the sensor to your Firewalla Box in the UI
+        if coordinator.data and "boxes" in coordinator.data and coordinator.data["boxes"]:
+            box_id = coordinator.data["boxes"][0].get("id")
+            self._attr_device_info = DeviceInfo(
+                identifiers={(DOMAIN, f"box_{box_id}")},
+                name=f"Firewalla Box",
+                manufacturer="Firewalla",
+            )
+
     @property
     def native_value(self):
-        """Return the most recent alarm message."""
-        # Check if data exists and is a list
-        data = self.coordinator.data.get("alarms", []) if self.coordinator.data else []
+        """Return the message of the most recent alarm."""
+        # Use a guard to prevent KeyError: 0
+        alarms = self.coordinator.data.get("alarms", []) if self.coordinator.data else []
         
-        if not isinstance(data, list) or len(data) == 0:
+        if not isinstance(alarms, list) or not alarms:
             return "No Alarms"
             
-        latest = data[0]
-        # Safely get the message
+        # Access the first alarm safely
+        latest = alarms[0]
         return latest.get("message", latest.get("msg", latest.get("type", "Unknown Event")))
 
     @property
     def extra_state_attributes(self):
         """Store the list of recent alarms in attributes."""
-        data = self.coordinator.data.get("alarms", []) if self.coordinator.data else []
+        alarms = self.coordinator.data.get("alarms", []) if self.coordinator.data else []
+        # This is where your 'Last 10' live
         return {
-            "total_alarms": len(data) if isinstance(data, list) else 0,
-            "recent_events": data[:10] if isinstance(data, list) else []
+            "total_alarms": len(alarms) if isinstance(alarms, list) else 0,
+            "recent_events": alarms[:10] if isinstance(alarms, list) else []
         }
