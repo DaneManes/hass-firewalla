@@ -33,6 +33,10 @@ async def async_setup_entry(
 ):
     """Set up sensors for Firewalla devices."""
     coordinator = hass.data[DOMAIN][entry.entry_id].get(COORDINATOR)
+
+    # Retrieve your new boolean flags from the entry
+    # We check options first (for changes after setup) then data (for initial setup)
+    enable_flows = entry.options.get(CONF_ENABLE_FLOWS, entry.data.get(CONF_ENABLE_FLOWS, False))
     
     if not coordinator:
         _LOGGER.error("No coordinator found for entry %s", entry.entry_id)
@@ -131,12 +135,18 @@ async def async_setup_entry(
                     entities.append(FirewallaTotalUploadSensor(coordinator, device))
                 
                 # Add flow sensors for this device
-                if device_id in device_flows:
-                    _LOGGER.debug("Adding %s flows for device %s", len(device_flows[device_id]), device_id)
-                    for flow in device_flows[device_id]:
-                        entities.append(FirewallaFlowSensor(coordinator, flow, device))
+                device_flows = {} # Initialize empty to avoid errors in device loop
+                # Only process and add flow sensors if the user explicitly enabled them
+                if enable_flows:
+                    _LOGGER.debug("Flow sensors are enabled, processing data...")
+                    if device_id in device_flows:
+                        _LOGGER.debug("Adding %s flows for device %s", len(device_flows[device_id]), device_id)
+                        for flow in device_flows[device_id]:
+                            entities.append(FirewallaFlowSensor(coordinator, flow, device))
+                    else:
+                        _LOGGER.debug("No flows found for device ID: %s", device_id)
                 else:
-                    _LOGGER.debug("No flows found for device ID: %s", device_id)
+                    _LOGGER.debug("Flow sensors are disabled, skipping entity creation")
                 
                 # Also check if this device's MAC address matches any flow device
                 if device_mac and device_mac in device_flows:
