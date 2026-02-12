@@ -260,28 +260,13 @@ class FirewallaApiClient:
             return []
 
     async def get_rules(self) -> List[Dict[str, Any]]:
-        """Get all rules - DISABLED."""
-        try:
-            _LOGGER.debug("Skipping flows to prevent entity bloat")
-            return []
-        except Exception as exc:
-            _LOGGER.warning("Error getting flows: %s", exc)
-            return []
+        """Get all rules."""
+        return await self._api_request("GET", "rules")
 
     async def get_alarms(self) -> List[Dict[str, Any]]:
-        """Get all alarms - DISABLED."""
-        try:
-            _LOGGER.debug("Skipping flows to prevent entity bloat")
-            return []
-        except Exception as exc:
-            _LOGGER.warning("Error getting flows: %s", exc)
-            return []
+        """Get all alarms."""
+        return await self._api_request("GET", "alarms")
 
     async def get_flows(self) -> List[Dict[str, Any]]:
-        """Get all flows - DISABLED."""
-        try:
-            _LOGGER.debug("Skipping flows to prevent entity bloat")
-            return []
-        except Exception as exc:
-            _LOGGER.warning("Error getting flows: %s", exc)
-            return []
+        """Get all flows."""
+        return await self._api_request("GET", "flows")
