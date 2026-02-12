@@ -265,7 +265,11 @@ class FirewallaApiClient:
 
     async def get_alarms(self) -> List[Dict[str, Any]]:
         """Get all alarms."""
-        return await self._api_request("GET", "alarms")
+        result = await self._api_request("GET", "alarms")
+        # Ensure we return a list even if the API wraps it in a dict
+        if isinstance(result, dict):
+            return result.get("alarms", result.get("data", []))
+        return result if isinstance(result, list) else []
 
     async def get_flows(self) -> List[Dict[str, Any]]:
         """Get all flows."""
