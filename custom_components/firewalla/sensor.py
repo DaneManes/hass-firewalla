@@ -595,11 +595,15 @@ class FirewallaRecentAlarmsSensor(CoordinatorEntity, SensorEntity):
     @property
     def native_value(self):
         """Return the most recent alarm message."""
+        # Get the list, default to empty list if None
         alarms = self.coordinator.data.get("alarms", [])
+        
+        # Safely check if we have ANY items before accessing index 0
         if not alarms:
             return "No Alarms"
+            
         latest = alarms[0]
-        # Check message first, then msg, then type
+        # Return message, msg, or type safely
         return latest.get("message", latest.get("msg", latest.get("type", "Unknown Event")))
 
     @property
@@ -608,5 +612,5 @@ class FirewallaRecentAlarmsSensor(CoordinatorEntity, SensorEntity):
         alarms = self.coordinator.data.get("alarms", [])
         return {
             "total_alarms": len(alarms),
-            "recent_events": alarms[:10] # Keep only the 10 most recent to save memory
+            "recent_events": alarms[:10] if alarms else []
         }
