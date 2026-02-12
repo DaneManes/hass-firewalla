@@ -11,6 +11,7 @@ CONF_SCAN_INTERVAL: Final = "scan_interval"
 CONF_ENABLE_ALARMS: Final = "enable_alarms"
 CONF_ENABLE_RULES: Final = "enable_rules"
 CONF_ENABLE_FLOWS: Final = "enable_flows"
+CONF_ENABLE_TRAFFIC: Final = "enable_traffic"
 
 # Default values
 DEFAULT_SUBDOMAIN: Final = "api"
