@@ -598,9 +598,9 @@ class FirewallaRecentAlarmsSensor(CoordinatorEntity, SensorEntity):
         alarms = self.coordinator.data.get("alarms", [])
         if not alarms:
             return "No Alarms"
-        # Get the 'msg' or 'type' from the first alarm in the list
         latest = alarms[0]
-        return latest.get("msg", latest.get("type", "Unknown Event"))
+        # Check message first, then msg, then type
+        return latest.get("message", latest.get("msg", latest.get("type", "Unknown Event")))
 
     @property
     def extra_state_attributes(self):
