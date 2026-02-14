@@ -74,7 +74,7 @@ class FirewallaApiClient:
         url = f"{self._base_url}/{endpoint}"
         _LOGGER.debug("%s request to %s", method, url)
         
-        # Updated SSL context that ignores certificate errors
+        # Updated SSL context to error out on API certifcate errors
         try:
             async with async_timeout.timeout(DEFAULT_TIMEOUT):
                 # Make the request with SSL context
