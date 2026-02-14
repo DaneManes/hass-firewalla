@@ -18,8 +18,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         return
 
     entities = []
-    # Loop through the devices exactly as the API provides them
-    for device in coordinator.data.get("devices", []):
+    for device in coordinator.data["devices"]:
         if isinstance(device, dict) and "id" in device:
             entities.append(FirewallaDeviceTracker(coordinator, device))
     
@@ -34,22 +33,24 @@ class FirewallaDeviceTracker(CoordinatorEntity, ScannerEntity):
         self.device_id = device["id"]
         self._attr_name = device.get("name", f"Firewalla Device {self.device_id}")
         
-        # Determine the Box ID for the grouping identifier
-        box_id = "firewalla_hub"
-        if coordinator.data.get("boxes") and len(coordinator.data["boxes"]) > 0:
-            box_id = coordinator.data["boxes"][0].get("id", "firewalla_hub")
+        # Link to the Box ID if available for the 'via_device' relationship
+        box_id = None
+        if coordinator.data.get("boxes"):
+            box_id = coordinator.data["boxes"][0].get("id")
 
-        # Reverting to the 'Box ID' grouping which was working for you
+        # Identity Fix: Use identifiers={(DOMAIN, self.device_id)} 
+        # to match your sensors exactly.
         self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, f"box_{box_id}")},
-            name="Firewalla Box",
+            identifiers={(DOMAIN, self.device_id)},
+            via_device=(DOMAIN, f"box_{box_id}") if box_id else None,
+            name=device.get("name", f"Firewalla Device {self.device_id}"),
             manufacturer="Firewalla",
-            model="Firewalla Box",
+            model="Network Device",
         )
 
     @property
     def unique_id(self) -> str:
-        """Return a unique ID to enable UI management."""
+        """Return a unique ID."""
         return f"{DOMAIN}_tracker_{self.device_id}"
 
     @property
@@ -77,7 +78,6 @@ class FirewallaDeviceTracker(CoordinatorEntity, ScannerEntity):
 
     def _get_device_data(self) -> dict:
         """Helper to find this device in the latest coordinator data."""
-        # Added a safety check for coordinator data
         devices = self.coordinator.data.get("devices", []) if self.coordinator.data else []
         return next((d for d in devices if d.get("id") == self.device_id), {})
 
