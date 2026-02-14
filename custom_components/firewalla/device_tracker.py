@@ -18,34 +18,38 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         return
 
     entities = []
-    for device in coordinator.data["devices"]:
-        # Firewalla sometimes uses 'mac' as the primary identifier if 'id' is absent
-        dev_id = device.get("id") or device.get("mac")
-        if dev_id:
-            entities.append(FirewallaDeviceTracker(coordinator, device, dev_id))
+    # Loop through the devices exactly as the API provides them
+    for device in coordinator.data.get("devices", []):
+        if isinstance(device, dict) and "id" in device:
+            entities.append(FirewallaDeviceTracker(coordinator, device))
     
     async_add_entities(entities)
 
 class FirewallaDeviceTracker(CoordinatorEntity, ScannerEntity):
     """Firewalla Device Tracker entity."""
 
-    def __init__(self, coordinator, device, dev_id):
+    def __init__(self, coordinator, device):
         """Initialize the tracker."""
         super().__init__(coordinator)
-        self.device_id = dev_id
+        self.device_id = device["id"]
         self._attr_name = device.get("name", f"Firewalla Device {self.device_id}")
         
-        # Identity Fix: Use the same ID as sensors to ensure they group together
+        # Determine the Box ID for the grouping identifier
+        box_id = "firewalla_hub"
+        if coordinator.data.get("boxes") and len(coordinator.data["boxes"]) > 0:
+            box_id = coordinator.data["boxes"][0].get("id", "firewalla_hub")
+
+        # Reverting to the 'Box ID' grouping which was working for you
         self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, self.device_id)},
-            name=device.get("name", f"Firewalla Device {self.device_id}"),
+            identifiers={(DOMAIN, f"box_{box_id}")},
+            name="Firewalla Box",
             manufacturer="Firewalla",
-            model="Network Device",
+            model="Firewalla Box",
         )
 
     @property
     def unique_id(self) -> str:
-        """Return a unique ID."""
+        """Return a unique ID to enable UI management."""
         return f"{DOMAIN}_tracker_{self.device_id}"
 
     @property
@@ -73,11 +77,11 @@ class FirewallaDeviceTracker(CoordinatorEntity, ScannerEntity):
 
     def _get_device_data(self) -> dict:
         """Helper to find this device in the latest coordinator data."""
-        devices = self.coordinator.data.get("devices", [])
+        # Added a safety check for coordinator data
+        devices = self.coordinator.data.get("devices", []) if self.coordinator.data else []
         return next((d for d in devices if d.get("id") == self.device_id), {})
 
     @callback
     def _handle_coordinator_update(self) -> None:
         """Update state on coordinator refresh."""
-        # This signals the UI to re-read the properties (is_connected, etc)
         self.async_write_ha_state()
