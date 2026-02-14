@@ -19,21 +19,23 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
     entities = []
     for device in coordinator.data["devices"]:
-        if isinstance(device, dict) and "id" in device:
-            entities.append(FirewallaDeviceTracker(coordinator, device))
+        # Firewalla sometimes uses 'mac' as the primary identifier if 'id' is absent
+        dev_id = device.get("id") or device.get("mac")
+        if dev_id:
+            entities.append(FirewallaDeviceTracker(coordinator, device, dev_id))
     
     async_add_entities(entities)
 
 class FirewallaDeviceTracker(CoordinatorEntity, ScannerEntity):
     """Firewalla Device Tracker entity."""
 
-    def __init__(self, coordinator, device):
+    def __init__(self, coordinator, device, dev_id):
         """Initialize the tracker."""
         super().__init__(coordinator)
-        self.device_id = device["id"]
+        self.device_id = dev_id
         self._attr_name = device.get("name", f"Firewalla Device {self.device_id}")
         
-        # LINK TO THE CLIENT, NOT THE BOX
+        # Identity Fix: Use the same ID as sensors to ensure they group together
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, self.device_id)},
             name=device.get("name", f"Firewalla Device {self.device_id}"),
@@ -43,7 +45,7 @@ class FirewallaDeviceTracker(CoordinatorEntity, ScannerEntity):
 
     @property
     def unique_id(self) -> str:
-        """Return a unique ID to enable UI management."""
+        """Return a unique ID."""
         return f"{DOMAIN}_tracker_{self.device_id}"
 
     @property
