@@ -5,6 +5,5 @@
   "documentation": "https://github.com/DaneManes/hass-firewalla",
   "iot_class": "cloud_polling",
   "codeowners": ["@DaneManes"],
-  "version": "1.0.1",
-  "logo": "custom_components/firewalla/icon.png"
+  "version": "1.0.2"
 }
