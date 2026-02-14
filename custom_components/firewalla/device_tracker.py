@@ -50,6 +50,11 @@ class FirewallaDeviceTracker(CoordinatorEntity, ScannerEntity):
         )
 
     @property
+    def entity_registry_enabled_default(self) -> bool:
+        """Force entities to be enabled by default on discovery."""
+        return True
+    
+    @property
     def unique_id(self) -> str:
         """Return a unique ID to enable UI management."""
         return f"{DOMAIN}_tracker_{self.device_id}"
