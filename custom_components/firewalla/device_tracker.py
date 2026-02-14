@@ -34,9 +34,15 @@ class FirewallaDeviceTracker(CoordinatorEntity, ScannerEntity):
         """Initialize the tracker."""
         super().__init__(coordinator)
         self.device_id = device["id"]
+        
+        # --- FIX: HARD-CODE THE MAC AT BIRTH ---
+        # Get the MAC immediately from the 'device' dict passed in during setup
+        mac = device.get("mac", self.device_id)
+        self._mac = mac[4:] if mac.startswith("mac:") else mac
+        # ----------------------------------------
+
         self._attr_name = device.get("name", f"Firewalla Device {self.device_id}")
         
-        # Pull Box ID for grouping under the main Firewalla hardware
         box_id = "firewalla_hub"
         if coordinator.data.get("boxes"):
             box_id = coordinator.data["boxes"][0].get("id")
@@ -45,8 +51,6 @@ class FirewallaDeviceTracker(CoordinatorEntity, ScannerEntity):
             identifiers={(DOMAIN, f"box_{box_id}")},
             name="Firewalla Box",
             manufacturer="Firewalla",
-            model="Firewalla Purple",
-            configuration_url="https://my.firewalla.com",
         )
 
     @property
@@ -76,9 +80,8 @@ class FirewallaDeviceTracker(CoordinatorEntity, ScannerEntity):
 
     @property
     def mac_address(self) -> str:
-        """Return the MAC address."""
-        mac = self._get_device_data().get("mac", self.device_id)
-        return mac[4:] if mac.startswith("mac:") else mac
+        """Return the pre-stored MAC address."""
+        return self._mac
 
     def _get_device_data(self) -> dict:
         """Helper to find this device in the latest coordinator data."""
