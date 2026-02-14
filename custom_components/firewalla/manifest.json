@@ -1,6 +1,7 @@
 {
   "domain": "firewalla",
   "name": "Firewalla",
+  "config_flow": true,
   "documentation": "https://github.com/DaneManes/hass-firewalla",
   "iot_class": "cloud_polling",
   "codeowners": ["@DaneManes"],
