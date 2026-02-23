@@ -1,1 +1,46 @@
-
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to Firewalla",
+        "description": "Set up Firewalla integration. You need to create a personal access token in your Firewalla MSP account.",
+        "data": {
+          "subdomain": "Firewalla Subdomain",
+          "api_token": "API Token"
+        },
+        "data_description": {
+          "subdomain": "This is the unique subdomain for your MSP account (the part before .firewalla.net)",
+          "api_token": "To get your API token, go to your Firewalla MSP account > Account Settings > Create New Token."
+        }
+      }
+    },
+    "error": {
+      "auth": "Authentication failed. Please check your subdomain and API token."
+    },
+      "abort": {
+      "already_configured": "This Firewalla instance is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Firewalla Entities and Settings",
+        "description": "Enable the following entities and metrics.",
+        "data": {
+          "track_devices": "Enable Device Tracking",
+          "enable_alarms": "Enable Alarms",
+          "enable_rules": "Enable Rules",
+          "enable_flows": "Enable Flows (Heavy)",
+          "enable_traffic": "Enable Traffic (Heavy)"
+        },
+        "data_description": {
+          "track_devices": "Track devices online states.",
+          "enable_alarms": "Last 10 alarms across all devices.",
+          "enable_rules": "Display Firewalla rules.",
+          "enable_flows": "Display data flows on devices - high HA recorder/DB load!",
+          "enable_traffic": "Display traffic metrics on devices - high HA recorder/DB load!"
+        }
+      }
+    }
+  }
+}
