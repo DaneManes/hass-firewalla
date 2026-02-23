@@ -6,7 +6,7 @@
           "description": "Set up Firewalla integration. You need to create a personal access token in your Firewalla MSP account.",
           "data": {
             "subdomain": "Firewalla Subdomain",
-            "api_token": "API Token",
+            "api_token": "MSP API Token",
             "enable_alarms": "Enable Alarms",
             "enable_rules": "Enable Rules",
             "enable_flows": "Enable Flows (Heavy)",
@@ -23,5 +23,3 @@
       }
     }
   }
-  
-  
