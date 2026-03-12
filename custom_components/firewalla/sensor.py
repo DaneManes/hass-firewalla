@@ -1,7 +1,7 @@
 """Sensor platform for Firewalla integration."""
 import logging
 from typing import Any, Dict, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -22,7 +22,8 @@ from .const import (
     ATTR_NETWORK_ID,
     CONF_ENABLE_FLOWS,
     CONF_ENABLE_TRAFFIC,
-    CONF_ENABLE_ALARMS
+    CONF_ENABLE_ALARMS,
+    CONF_ENABLE_RULES
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -39,6 +40,7 @@ async def async_setup_entry(
     enable_flows = opts.get(CONF_ENABLE_FLOWS, data_src.get(CONF_ENABLE_FLOWS, False))
     enable_traffic = opts.get(CONF_ENABLE_TRAFFIC, data_src.get(CONF_ENABLE_TRAFFIC, False))
     enable_alarms = opts.get(CONF_ENABLE_ALARMS, data_src.get(CONF_ENABLE_ALARMS, False))
+    enable_rules = opts.get(CONF_ENABLE_RULES, data_src.get(CONF_ENABLE_RULES, False))
     
     if not coordinator or not coordinator.data:
         return
@@ -55,7 +57,10 @@ async def async_setup_entry(
         # Identity Sensors
         entities.append(FirewallaMacAddressSensor(coordinator, device))
         entities.append(FirewallaIpAddressSensor(coordinator, device))
+        entities.append(FirewallaLastActiveSensor(coordinator, device))
+        entities.append(FirewallaIpReservationSensor(coordinator, device))
         entities.append(FirewallaNetworkNameSensor(coordinator, device))
+        entities.append(FirewallaGroupNameSensor(coordinator, device))
         
         # Bandwidth Sensors
         if enable_traffic:
@@ -76,9 +81,14 @@ async def async_setup_entry(
             entities.append(FirewallaFlowSensor(coordinator, flow, device))
 
     # 4. Process Alarms (Summary Sensor)
-    if enable_alarms:
+    if enable_alarms and "alarms" in coordinator.data:
         entities.append(FirewallaRecentAlarmsSensor(coordinator))
-    
+
+    # 5. Process Rules (Summary Sensor)
+    if enable_rules and "rules" in coordinator.data:
+        entities.append(FirewallaRulesSummarySensor(coordinator))
+
+    # 6. Finally add entities to the database
     if entities:
         async_add_entities(entities)
 
@@ -106,10 +116,10 @@ class FirewallaMacAddressSensor(FirewallaBaseSensor):
     """Sensor for MAC Address."""
     def __init__(self, coordinator, device):
         super().__init__(coordinator, device, "MAC Address")
+        self._attr_icon = "mdi:fingerprint"
 
     @property
     def native_value(self):
-        # Find the device in latest data
         device = next((d for d in self.coordinator.data.get("devices", []) if d.get("id") == self.device_id), None)
         if not device:
             return None
@@ -121,6 +131,7 @@ class FirewallaIpAddressSensor(FirewallaBaseSensor):
     """Sensor for IP Address."""
     def __init__(self, coordinator, device):
         super().__init__(coordinator, device, "IP Address")
+        self._attr_icon = "mdi:ip-network"
 
     @property
     def native_value(self):
@@ -130,10 +141,11 @@ class FirewallaIpAddressSensor(FirewallaBaseSensor):
             
         return device.get("ip")
 
-class FirewallaNetworkNameSensor(FirewallaBaseSensor):
-    """Sensor for Network Name."""
+class FirewallaIpReservationSensor(FirewallaBaseSensor):
+    """Sensor for IP Address."""
     def __init__(self, coordinator, device):
-        super().__init__(coordinator, device, "Network Name")
+        super().__init__(coordinator, device, "IP Reservation")
+        self._attr_icon = "mdi:ip"
 
     @property
     def native_value(self):
@@ -141,7 +153,73 @@ class FirewallaNetworkNameSensor(FirewallaBaseSensor):
         if not device:
             return None
             
-        return device.get("network", {}).get("name")
+        is_reserved = device.get("ipReserved")
+        if is_reserved is True:
+            return "Reserved"
+        
+        return "DHCP"
+
+class FirewallaLastActiveSensor(FirewallaBaseSensor):
+    """Sensor for device last seen time."""
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+
+    def __init__(self, coordinator, device):
+        super().__init__(coordinator, device, "Last Active")
+
+    @property
+    def native_value(self):
+        """Return the timestamp as a datetime object."""
+        device = next((d for d in self.coordinator.data.get("devices", []) if d.get("id") == self.device_id), None)
+        if not device:
+            return None
+            
+        last_active = device.get("lastSeen")
+        if not last_active:
+            return None
+
+        try:
+            # Firewalla gives us a float Unix epoch
+            timestamp = float(last_active)
+            # We return a timezone-aware UTC datetime
+            return datetime.fromtimestamp(timestamp, tz=timezone.utc)
+        except (ValueError, TypeError):
+            return None
+
+class FirewallaNetworkNameSensor(FirewallaBaseSensor):
+    """Sensor for Network Name."""
+    def __init__(self, coordinator, device):
+        super().__init__(coordinator, device, "Network Name")
+        self._attr_icon = "mdi:account-network"
+
+    @property
+    def native_value(self):
+        device = next((d for d in self.coordinator.data.get("devices", []) if d.get("id") == self.device_id), None)
+        if not device:
+            return None
+            
+        network_info = device.get("network")
+        if network_info:
+            return network_info.get("name", "No name")
+        
+        return "None"
+
+class FirewallaGroupNameSensor(FirewallaBaseSensor):
+    """Sensor for Group Name."""
+    def __init__(self, coordinator, device):
+        super().__init__(coordinator, device, "Group Name")
+        self._attr_icon = "mdi:account-group"
+
+    @property
+    def native_value(self):
+        device = next((d for d in self.coordinator.data.get("devices", []) if d.get("id") == self.device_id), None)
+        if not device:
+            return None
+            
+        group_info = device.get("group")
+        if group_info:
+            return group_info.get("name", "Ungrouped")
+        
+        return "None"
 
 class FirewallaTotalDownloadSensor(FirewallaBaseSensor):
     """Sensor for Total Download."""
@@ -156,7 +234,6 @@ class FirewallaTotalDownloadSensor(FirewallaBaseSensor):
     @property
     def native_value(self):
         """Return the native value of the sensor."""
-        # Find the device in the current coordinator data
         devices = self.coordinator.data.get("devices", [])
         device = next((d for d in devices if d.get("id") == self.device_id), None)
         
@@ -180,7 +257,6 @@ class FirewallaTotalUploadSensor(FirewallaBaseSensor):
     @property
     def native_value(self):
         """Return the native value of the sensor."""
-        # Find the device in the current coordinator data
         devices = self.coordinator.data.get("devices", [])
         device = next((d for d in devices if d.get("id") == self.device_id), None)
         
@@ -191,23 +267,20 @@ class FirewallaTotalUploadSensor(FirewallaBaseSensor):
         upload_bytes = device.get("totalUpload", 0)
         return round(upload_bytes / 1024, 2)
 
-class FirewallaRecentAlarmsSensor(FirewallaBaseSensor):
+class FirewallaRecentAlarmsSensor(CoordinatorEntity, SensorEntity):
     """Summary sensor for security events."""
     _attr_icon = "mdi:shield-alert"
     
     def __init__(self, coordinator):
         """Initialize the summary sensor."""
-        # 1. We create a 'fake' device dict to satisfy the Base Class requirements
-        # This keeps the unique_id generation consistent.
-        dummy_device = {"id": "global_alarms", "name": "Firewalla"}
+        super().__init__(coordinator)
+
+        self._attr_name = "Firewalla Recent Alarms"
+        self._attr_unique_id = f"{DOMAIN}_recent_alarms_summary"
+        self._attr_icon = "mdi:shield-alert"
+        self._attr_native_unit_of_measurement = "alarms"
         
-        # 2. Call the base class with all 3 required arguments
-        super().__init__(coordinator, dummy_device, "Recent Alarms")
-        
-        # 3. Explicitly set the unique_id (overriding the base class version if preferred)
-        self._attr_unique_id = f"{DOMAIN}_recent_alarms_summary_v2"
-        
-        # 4. Link it to the Firewalla Box Device Card
+        # Link it to the Firewalla Box Device Card
         if coordinator.data.get("boxes") and coordinator.data["boxes"]:
             box_id = coordinator.data["boxes"][0].get("id")
             self._attr_device_info = DeviceInfo(
@@ -218,19 +291,27 @@ class FirewallaRecentAlarmsSensor(FirewallaBaseSensor):
 
     @property
     def native_value(self):
-        """Return the message of the most recent alarm."""
-        alarms = self.coordinator.data.get("alarms", []) if self.coordinator.data else []
-        if not alarms:
-            return "No Alarms"
-        return alarms[0].get("message", "Unknown Event")
+        """Return the NUMBER of alarms so the unit 'alarms' is valid."""
+        return len(self.coordinator.data.get("alarms", []))
 
     @property
     def extra_state_attributes(self):
-        """Store the list of recent alarms in attributes."""
-        alarms = self.coordinator.data.get("alarms", []) if self.coordinator.data else []
+        alarms = self.coordinator.data.get("alarms", [])
+        
+        processed_alarms = []
+        for a in alarms[:20]:  # Keep the 20 most recent
+            raw_ts = a.get("ts") or a.get("activeTs") or a.get("updatedAt")
+            processed_alarms.append({
+                "message": a.get("message"),
+                "type": a.get("_type", "Unknown"),
+                "device": a.get("device", {}).get("name", "Unknown Device"),
+                "dest": a.get("remote", {}).get("domain") or a.get("remote", {}).get("ip", "N/A"),
+                "time": raw_ts if raw_ts else 0
+            })
+            
         return {
             "total_alarms": len(alarms),
-            "recent_events": alarms[:5]
+            "recent_events": processed_alarms
         }
 
 class FirewallaFlowSensor(FirewallaBaseSensor):
@@ -272,3 +353,76 @@ class FirewallaFlowSensor(FirewallaBaseSensor):
         # Look up the latest data for this specific flow from the coordinator
         flow = next((f for f in self.coordinator.data.get("flows", []) if f["id"] == self.flow_id), {})
         return round((flow.get("download", 0) + flow.get("upload", 0)) / 1024, 2)
+
+class FirewallaRulesSummarySensor(CoordinatorEntity, SensorEntity):
+    """A single sensor that collects and summarizes all Firewalla rules."""
+
+    def __init__(self, coordinator):
+        """Initialize the summary sensor."""
+        super().__init__(coordinator)
+        self._attr_name = "Firewalla Rules"
+        self._attr_unique_id = f"{DOMAIN}_rules_summary"
+        self._attr_icon = "mdi:shield-edit"
+        self._attr_native_unit_of_measurement = "rules"
+
+        # This links the sensor to the Firewalla Box device in the UI
+        if coordinator.data.get("boxes"):
+            box_id = coordinator.data["boxes"][0].get("id")
+            self._attr_device_info = DeviceInfo(
+                identifiers={(DOMAIN, f"box_{box_id}")},
+            )
+
+    @property
+    def native_value(self):
+        """The state is the total count of rules."""
+        return len(self.coordinator.data.get("rules", []))
+
+    @property
+    def extra_state_attributes(self):
+        """Build a meaningful dictionary of rules using Device and Group names."""
+        raw_rules = self.coordinator.data.get("rules", [])
+        devices_data = self.coordinator.data.get("devices", [])
+        
+        # 1. Build Lookup Maps from the devices list
+        name_map = {}
+        for d in devices_data:
+            d_id = d.get("id")
+            d_name = d.get("name") or d.get("ip")
+            
+            # Map the Device ID to its Name
+            if d_id:
+                name_map[str(d_id)] = d_name
+            
+            # Map the Group ID to its Name (found inside the device object)
+            group_info = d.get("group")
+            if group_info and group_info.get("id"):
+                name_map[str(group_info["id"])] = group_info.get("name")
+
+        processed_rules = []
+        for rule in raw_rules:
+            scope_obj = rule.get("scope", {})
+            scope_id = str(scope_obj.get("value", ""))
+            
+            # Resolve Scope Name
+            resolved_scope = name_map.get(scope_id) or scope_id or "All Devices"
+            
+            target_obj = rule.get("target", {})
+            target_val = target_obj.get("value") or "System"
+            # RE-ADDED: Get the target type (e.g., domain, ip, region)
+            target_type = target_obj.get("type", "unknown").upper() 
+
+            processed_rules.append({
+                "name": rule.get("notes") or f"{rule.get('action').capitalize()} {target_val}",
+                "action": rule.get("action"),
+                "scope": resolved_scope,
+                "target": target_val,
+                "target_type": target_type, # <--- Back in the mix!
+                "active": rule.get("status") == "active",
+                "time": rule.get("ts")
+            })
+
+        return {
+            "rules_list": processed_rules,
+            "total_rules": len(processed_rules),
+            "active_rules": sum(1 for r in processed_rules if r.get("active"))
+        }
