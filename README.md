@@ -45,7 +45,7 @@ This integration allows you to monitor and control your Firewalla devices from H
 3. You will need YAML templates to display the alarms and rules - see below.
 
 ## Alarm Display markdown YAML template example
-
+```
    type: markdown
    content: >-
      ### 🔔 Firewalla Alarm Feed
@@ -64,9 +64,9 @@ This integration allows you to monitor and control your Firewalla devices from H
      {% else %}
        No recent alarms.
      {% endif %}
-
+```
 ## Rule Display markdown YAML template example
-
+```
    type: markdown
    content: >-
      ### 🛡️ Firewalla Rules
@@ -87,7 +87,7 @@ This integration allows you to monitor and control your Firewalla devices from H
      {% else %}
        No rules found in attributes.
      {% endif %}
-
+```
 ## Firewall API MSP challenges
 
 1. Firewalla does not always return at nice group name for entities where the device has been setup as a "user" on Firewalla. Unfortunately users are not yet returned on the API and you will only get UUID values. There is probably a way to figure this out, but I can live with the limitation at this time.
