@@ -14,9 +14,9 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
-    DOMAIN, 
+    DOMAIN,
     ATTR_DEVICE_ID
-)
+    )
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -64,7 +64,7 @@ class FirewallaOnlineSensor(FirewallaBaseBinarySensor):
         self._attr_name = f"{device.get('name', 'Unknown')} Online"
         self._attr_unique_id = f"{DOMAIN}_online_{self.device_id}"
         self._attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
-        
+
         # Group with the specific device
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, self.device_id)},
@@ -84,6 +84,7 @@ class FirewallaOnlineSensor(FirewallaBaseBinarySensor):
 
     def _update_attributes(self, device):
         self._attr_is_on = device.get("online", False)
+        
         self._attr_extra_state_attributes = {
             "ip_address": device.get("ip"),
             "mac_address": device.get("mac"),
