@@ -38,6 +38,60 @@ This integration allows you to monitor and control your Firewalla devices from H
 5. Enter your Firewalla API token
    - To get your API token, go to your Firewalla MSP account > Account Settings > Create New Token
 
+## Changes to original code
+
+1. The integration no longer creates separate entities for both alarms and rules. They are now blobbed and need a template to display.
+2. I've capped the number of alarms returned at 20 - need to put this as a parameter in the setup one day.
+3. You will need YAML templates to display the alarms and rules - see below.
+
+## Alarm Display markdown YAML template example
+
+   type: markdown
+   content: >-
+     ### 🔔 Firewalla Alarm Feed
+   
+     {% set events = state_attr('sensor.firewalla_recent_alarms', 'recent_events')
+     %}
+   
+     {% if events %}
+       {# Change the display of 10 below to however many alarms you need #}
+       {% for alarm in events[:10] %}
+       **{{ (alarm.time | as_datetime).strftime('%x %X') }} | {{ alarm.device }}**
+       {{ alarm.message }}
+       
+       ***
+       {% endfor %}
+     {% else %}
+       No recent alarms.
+     {% endif %}
+
+## Rule Display markdown YAML template example
+
+   type: markdown
+   content: >-
+     ### 🛡️ Firewalla Rules
+   
+     **Total:** {{ state_attr('sensor.firewalla_rules', 'total_rules') }} |
+     **Active:** {{ state_attr('sensor.firewalla_rules', 'active_rules') }}
+   
+   
+     {% set rules = state_attr('sensor.firewalla_rules', 'rules_list') %}
+   
+     {% if rules %}
+       {% for rule in rules %}
+       **{{ '🚫' if rule.action == 'block' else '✅' }} {{ rule.name }}**
+       Target: `{{ rule.target }}` ({{ rule.target_type }}) | Scope: {{ rule.scope }}
+       
+       ***
+       {% endfor %}
+     {% else %}
+       No rules found in attributes.
+     {% endif %}
+
+## Firewall API MSP challenges
+
+1. Firewalla does not always return at nice group name for entities where the device has been setup as a "user" on Firewalla. Unfortunately users are not yet returned on the API and you will only get UUID values. There is probably a way to figure this out, but I can live with the limitation at this time.
+
 ## Resolving API Issues
 
 To get real data from your Firewalla devices:
