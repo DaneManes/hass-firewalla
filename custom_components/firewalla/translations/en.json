@@ -6,7 +6,15 @@
         "description": "Set up Firewalla integration. You need to create a personal access token in your Firewalla MSP account.",
         "data": {
           "subdomain": "Firewalla Subdomain",
-          "api_token": "API Token"
+          "api_token": "API Token",
+          "scan_interval": "API refresh time in seconds",
+          "track_devices": "Enable Device Tracking",
+          "enable_alarms": "Enable Alarms",
+          "enable_rules": "Enable Rules",
+          "enable_flows": "Enable Flows (Heavy)",
+          "enable_traffic": "Enable Traffic (Heavy)",
+          "alarm_count": "Initial Alarm Limit",
+          "flow_count": "Initial Flow Limit"
         },
         "data_description": {
           "subdomain": "This is the unique subdomain for your MSP account (the part before .firewalla.net)",
@@ -17,7 +25,7 @@
     "error": {
       "auth": "Authentication failed. Please check your subdomain and API token."
     },
-      "abort": {
+    "abort": {
       "already_configured": "This Firewalla instance is already configured."
     }
   },
@@ -27,6 +35,7 @@
         "title": "Firewalla Entities and Settings",
         "description": "Enable the following entities and metrics.",
         "data": {
+          "scan_interval": "API refresh time in seconds",
           "track_devices": "Enable Device Tracking",
           "enable_alarms": "Enable Alarms",
           "enable_rules": "Enable Rules",
@@ -35,10 +44,19 @@
         },
         "data_description": {
           "track_devices": "Track devices online states.",
-          "enable_alarms": "Last 10 alarms across all devices.",
+          "enable_alarms": "Last alarms across all devices (configure on next page).",
           "enable_rules": "Display Firewalla rules.",
-          "enable_flows": "Display data flows on devices - high HA recorder/DB load!",
+          "enable_flows": "Display data flows on devices - high HA recorder/DB load! (configure on next page)",
           "enable_traffic": "Display traffic metrics on devices - high HA recorder/DB load!"
+        }
+      },
+      "counts": {
+        "title": "Configure Limits",
+        "description": "Set the maximum number of entries to keep in Home Assistant state attributes for enabled features.",
+        "data": {
+          "alarm_count": "Number of alarms to persist in HA",
+          "flow_count": "Number of recent flows PER DEVICE to persist in HA (subset of total count below).",
+          "total_flow_count": "Number of total recent flows shared across all devices as a hard API maximum."
         }
       }
     }
