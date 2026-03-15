@@ -1,10 +1,11 @@
 """Config flow for Firewalla integration."""
 import logging
+from typing import Any
 import voluptuous as vol
 
 from homeassistant import config_entries
+from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.selector import BooleanSelector
 import homeassistant.helpers.config_validation as cv
 from homeassistant.const import CONF_SCAN_INTERVAL
 
@@ -34,16 +35,17 @@ class FirewallaConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Firewalla."""
 
     VERSION = 1
-    CONNECTION_CLASS = config_entries.CONN_CLASS_CLOUD_POLL
 
-    async def async_step_user(self, user_input=None):
-        """Handle the initial step."""
+    # Class attribute to persist data across steps without using __init__
+    _init_data: dict[str, Any] = {}
+
+    async def async_step_user(self, user_input: dict[str, Any] | None = None):
+        """Handle the initial setup step."""
         errors = {}
 
         if user_input is not None:
             session = async_get_clientsession(self.hass)
             
-            # Create API client with the provided credentials
             api_client = FirewallaApiClient(
                 session=session,
                 api_token=user_input.get(CONF_API_TOKEN),
@@ -51,49 +53,34 @@ class FirewallaConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             )
 
             try:
-                # Test the API connection
                 auth_success = await api_client.async_check_credentials()
                 
                 if auth_success:
-                    # Use a combination of subdomain and token as the unique ID
-                    await self.async_set_unique_id(f"{user_input[CONF_SUBDOMAIN]}_{user_input.get(CONF_API_TOKEN, '')}")
-                    self._abort_if_unique_id_configured()
+                    # Store data for the next step
+                    self._init_data = user_input
                     
-                    return self.async_create_entry(
-                        title=f"Firewalla ({user_input[CONF_SUBDOMAIN]})",
-                        data=user_input,
-                    )
-                else:
-                    errors["base"] = "auth"
+                    # Branch to Step 2 if "Heavy" features are enabled
+                    if user_input.get(CONF_ENABLE_ALARMS) or user_input.get(CONF_ENABLE_FLOWS):
+                        return await self.async_step_counts()
+                    
+                    # Direct finish if no counts are needed
+                    return await self._async_create_firewalla_entry()
+                
+                errors["base"] = "auth"
             except Exception as ex:
                 _LOGGER.error("Error during authentication: %s", ex)
                 errors["base"] = "auth"
-
-        # Set default values
-        default_values = {
-            CONF_SUBDOMAIN: DEFAULT_SUBDOMAIN,
-            CONF_SCAN_INTERVAL: DEFAULT_SCAN_INTERVAL,
-        }
-        
-        # If we have user input, use those values as defaults
-        if user_input is not None:
-            for key in default_values:
-                if key in user_input:
-                    default_values[key] = user_input[key]
 
         return self.async_show_form(
             step_id="user",
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_SUBDOMAIN, default=default_values[CONF_SUBDOMAIN]): str,
+                    vol.Required(CONF_SUBDOMAIN, default=DEFAULT_SUBDOMAIN): str,
                     vol.Required(CONF_API_TOKEN): str,
-                    vol.Required(CONF_SCAN_INTERVAL, default=default_values[CONF_SCAN_INTERVAL]): int,
-                    # Adding the toggles:
+                    vol.Required(CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL): int,
                     vol.Optional(CONF_ENABLE_ALARMS, default=False): bool,
-                    vol.Optional(CONF_ALARM_COUNT, default=False): int,
                     vol.Optional(CONF_ENABLE_RULES, default=False): bool,
                     vol.Optional(CONF_ENABLE_FLOWS, default=False): bool,
-                    vol.Optional(CONF_FLOW_COUNT, default=False): int,
                     vol.Optional(CONF_ENABLE_TRAFFIC, default=False): bool,
                     vol.Optional(CONF_TRACK_DEVICES, default=False): bool,
                 }
@@ -101,72 +88,93 @@ class FirewallaConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
+    async def async_step_counts(self, user_input: dict[str, Any] | None = None):
+        """Step 2: Force limits to prevent 16k attribute crash."""
+        if user_input is not None:
+            self._init_data.update(user_input)
+            return await self._async_create_firewalla_entry()
+
+        fields = {}
+        # Only show fields that were enabled in Step 1
+        if self._init_data.get(CONF_ENABLE_FLOWS):
+            fields[vol.Optional(CONF_FLOW_COUNT, default=DEFAULT_FLOW_COUNT)] = cv.positive_int
+            fields[vol.Optional(CONF_TOTAL_FLOW_COUNT, default=DEFAULT_TOTAL_FLOW_COUNT)] = cv.positive_int
+        
+        if self._init_data.get(CONF_ENABLE_ALARMS):
+            fields[vol.Optional(CONF_ALARM_COUNT, default=DEFAULT_ALARM_COUNT)] = cv.positive_int
+
+        return self.async_show_form(
+            step_id="counts",
+            data_schema=vol.Schema(fields)
+        )
+
+    async def _async_create_firewalla_entry(self):
+        """Finalize the config entry."""
+        unique_id = f"{self._init_data[CONF_SUBDOMAIN]}_{self._init_data.get(CONF_API_TOKEN, '')}"
+        await self.async_set_unique_id(unique_id)
+        self._abort_if_unique_id_configured()
+        
+        return self.async_create_entry(
+            title=f"Firewalla ({self._init_data[CONF_SUBDOMAIN]})",
+            data=self._init_data,
+        )
+
     @staticmethod
-    def async_get_options_flow(config_entry):
-        """Get the options flow for this handler."""
-        return FirewallaOptionsFlowHandler()
+    @callback
+    def async_get_options_flow(config_entry: config_entries.ConfigEntry):
+        """Return the options flow handler."""
+        return FirewallaOptionsFlowHandler(config_entry)
+
 
 class FirewallaOptionsFlowHandler(config_entries.OptionsFlow):
-    """Handle Firewalla options."""
+    """Handle options via the config wheel."""
 
-    async def async_step_init(self, user_input=None):
-        """First step: Toggles."""
+    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
+        """Initialize with private attribute to avoid read-only conflicts."""
+        self._config_entry = config_entry
+        self.options = dict(config_entry.options)
+
+    async def async_step_init(self, user_input: dict[str, Any] | None = None):
+        """Options Step 1: Toggles."""
         if user_input is not None:
-            # Store the toggles in a temporary variable
-            self.data = user_input
-            # If flows or alarms are enabled, go to the counts step
+            self.options.update(user_input)
+            
             if user_input.get(CONF_ENABLE_FLOWS) or user_input.get(CONF_ENABLE_ALARMS):
                 return await self.async_step_counts()
             
-            # Otherwise, just save
-            return self.async_create_entry(title="", data=user_input)
+            return self.async_create_entry(title="", data=self.options)
+            
+        def get_val(key, default=False):
+            # Fallback chain: Current Options -> Original Install Data -> Global Default
+            return self._config_entry.options.get(key, self._config_entry.data.get(key, default))
 
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema({
-                vol.Required(CONF_SCAN_INTERVAL, default=self.config_entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)): int,
-                vol.Optional(CONF_ENABLE_FLOWS, default=self.config_entry.options.get(CONF_ENABLE_FLOWS, False)): bool,
-                vol.Optional(CONF_ENABLE_ALARMS, default=self.config_entry.options.get(CONF_ENABLE_ALARMS, False)): bool,
-                vol.Optional(CONF_ENABLE_TRAFFIC, default=self.config_entry.options.get(CONF_ENABLE_TRAFFIC, False)): bool,
-                vol.Optional(CONF_ENABLE_RULES, default=self.config_entry.options.get(CONF_ENABLE_RULES, False)): bool,
-                vol.Optional(CONF_TRACK_DEVICES, default=self.config_entry.options.get(CONF_TRACK_DEVICES, False)): bool,
+                vol.Required(CONF_SCAN_INTERVAL, default=get_val(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)): int,
+                vol.Optional(CONF_ENABLE_FLOWS, default=get_val(CONF_ENABLE_FLOWS)): bool,
+                vol.Optional(CONF_ENABLE_ALARMS, default=get_val(CONF_ENABLE_ALARMS)): bool,
+                vol.Optional(CONF_ENABLE_TRAFFIC, default=get_val(CONF_ENABLE_TRAFFIC)): bool,
+                vol.Optional(CONF_ENABLE_RULES, default=get_val(CONF_ENABLE_RULES)): bool,
+                vol.Optional(CONF_TRACK_DEVICES, default=get_val(CONF_TRACK_DEVICES)): bool,
             }),
         )
 
-    async def async_step_counts(self, user_input=None):
-        """Second step: Conditionally show counts."""
+    async def async_step_counts(self, user_input: dict[str, Any] | None = None):
+        """Options Step 2: Limits."""
         if user_input is not None:
-            # Merge the counts with the toggles from the previous step
-            self.data.update(user_input)
-            return self.async_create_entry(title="", data=self.data)
+            self.options.update(user_input)
+            return self.async_create_entry(title="", data=self.options)
 
         fields = {}
+        def get_count_val(key, default):
+            return self._config_entry.options.get(key, self._config_entry.data.get(key, default))
         
-        # Only add flow count if flows were enabled in step 1
-        if self.data.get(CONF_ENABLE_FLOWS):
-            flow_default = self.config_entry.options.get(
-                CONF_FLOW_COUNT, 
-                self.config_entry.data.get(CONF_FLOW_COUNT, DEFAULT_FLOW_COUNT)
-            )
-            fields[vol.Optional(CONF_FLOW_COUNT, default=flow_default)] = cv.positive_int
+        if self.options.get(CONF_ENABLE_FLOWS):
+            fields[vol.Optional(CONF_FLOW_COUNT, default=get_count_val(CONF_FLOW_COUNT, DEFAULT_FLOW_COUNT))] = cv.positive_int
+            fields[vol.Optional(CONF_TOTAL_FLOW_COUNT, default=get_count_val(CONF_TOTAL_FLOW_COUNT, DEFAULT_TOTAL_FLOW_COUNT))] = cv.positive_int
         
-        if self.data.get(CONF_ENABLE_FLOWS):
-            total_flow_default = self.config_entry.options.get(
-                CONF_TOTAL_FLOW_COUNT, 
-                self.config_entry.data.get(CONF_TOTAL_FLOW_COUNT, DEFAULT_TOTAL_FLOW_COUNT)
-            )
-            fields[vol.Optional(CONF_TOTAL_FLOW_COUNT, default=total_flow_default)] = cv.positive_int
-        
-        # Only add alarm count if alarms were enabled in step 1
-        if self.data.get(CONF_ENABLE_ALARMS):
-            alarm_default = self.config_entry.options.get(
-                CONF_ALARM_COUNT, 
-                self.config_entry.data.get(CONF_ALARM_COUNT, DEFAULT_ALARM_COUNT)
-            )
-            fields[vol.Optional(CONF_ALARM_COUNT, default=alarm_default)] = cv.positive_int
+        if self.options.get(CONF_ENABLE_ALARMS):
+            fields[vol.Optional(CONF_ALARM_COUNT, default=get_count_val(CONF_ALARM_COUNT, DEFAULT_ALARM_COUNT))] = cv.positive_int
 
-        return self.async_show_form(
-            step_id="counts",
-            data_schema=vol.Schema(fields),
-            description_placeholders={"message": "Configure limits for the enabled features."}
-        )
+        return self.async_show_form(step_id="counts", data_schema=vol.Schema(fields))
