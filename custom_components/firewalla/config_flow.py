@@ -16,10 +16,16 @@ from .const import (
     DEFAULT_SUBDOMAIN,
     DEFAULT_SCAN_INTERVAL,
     CONF_ENABLE_ALARMS,
+    DEFAULT_ALARM_COUNT,
+    CONF_ALARM_COUNT,
     CONF_ENABLE_RULES,
     CONF_ENABLE_FLOWS,
+    DEFAULT_FLOW_COUNT,
+    CONF_FLOW_COUNT,
     CONF_ENABLE_TRAFFIC,
-    CONF_TRACK_DEVICES
+    CONF_TRACK_DEVICES,
+    CONF_TOTAL_FLOW_COUNT,
+    DEFAULT_TOTAL_FLOW_COUNT,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -84,8 +90,10 @@ class FirewallaConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Required(CONF_SCAN_INTERVAL, default=default_values[CONF_SCAN_INTERVAL]): int,
                     # Adding the toggles:
                     vol.Optional(CONF_ENABLE_ALARMS, default=False): bool,
+                    vol.Optional(CONF_ALARM_COUNT, default=False): int,
                     vol.Optional(CONF_ENABLE_RULES, default=False): bool,
                     vol.Optional(CONF_ENABLE_FLOWS, default=False): bool,
+                    vol.Optional(CONF_FLOW_COUNT, default=False): int,
                     vol.Optional(CONF_ENABLE_TRAFFIC, default=False): bool,
                     vol.Optional(CONF_TRACK_DEVICES, default=False): bool,
                 }
@@ -101,45 +109,64 @@ class FirewallaConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 class FirewallaOptionsFlowHandler(config_entries.OptionsFlow):
     """Handle Firewalla options."""
 
-    # DELETE THE __init__ BLOCK COMPLETELY
-    # HA will handle the config_entry assignment internally
-
     async def async_step_init(self, user_input=None):
-        """Manage the options."""
+        """First step: Toggles."""
         if user_input is not None:
+            # Store the toggles in a temporary variable
+            self.data = user_input
+            # If flows or alarms are enabled, go to the counts step
+            if user_input.get(CONF_ENABLE_FLOWS) or user_input.get(CONF_ENABLE_ALARMS):
+                return await self.async_step_counts()
+            
+            # Otherwise, just save
             return self.async_create_entry(title="", data=user_input)
 
-        # self.config_entry is automatically available here
         return self.async_show_form(
             step_id="init",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(
-                        CONF_SCAN_INTERVAL,
-                        default=self.config_entry.options.get(
-                            CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
-                        ),
-                    ): int,
-                    vol.Optional(
-                        CONF_ENABLE_FLOWS,
-                        default=self.config_entry.options.get(CONF_ENABLE_FLOWS, False),
-                    ): bool,
-                    vol.Optional(
-                        CONF_ENABLE_TRAFFIC,
-                        default=self.config_entry.options.get(CONF_ENABLE_TRAFFIC, False),
-                    ): bool,
-                    vol.Optional(
-                        CONF_ENABLE_ALARMS,
-                        default=self.config_entry.options.get(CONF_ENABLE_ALARMS, False),
-                    ): bool,
-                    vol.Optional(
-                    CONF_ENABLE_RULES,
-                    default=self.config_entry.options.get(CONF_ENABLE_RULES, False),
-                    ): bool,
-                    vol.Optional(
-                    CONF_TRACK_DEVICES,
-                    default=self.config_entry.options.get(CONF_TRACK_DEVICES, False),
-                    ): bool,
-                }
-            ),
+            data_schema=vol.Schema({
+                vol.Required(CONF_SCAN_INTERVAL, default=self.config_entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)): int,
+                vol.Optional(CONF_ENABLE_FLOWS, default=self.config_entry.options.get(CONF_ENABLE_FLOWS, False)): bool,
+                vol.Optional(CONF_ENABLE_ALARMS, default=self.config_entry.options.get(CONF_ENABLE_ALARMS, False)): bool,
+                vol.Optional(CONF_ENABLE_TRAFFIC, default=self.config_entry.options.get(CONF_ENABLE_TRAFFIC, False)): bool,
+                vol.Optional(CONF_ENABLE_RULES, default=self.config_entry.options.get(CONF_ENABLE_RULES, False)): bool,
+                vol.Optional(CONF_TRACK_DEVICES, default=self.config_entry.options.get(CONF_TRACK_DEVICES, False)): bool,
+            }),
+        )
+
+    async def async_step_counts(self, user_input=None):
+        """Second step: Conditionally show counts."""
+        if user_input is not None:
+            # Merge the counts with the toggles from the previous step
+            self.data.update(user_input)
+            return self.async_create_entry(title="", data=self.data)
+
+        fields = {}
+        
+        # Only add flow count if flows were enabled in step 1
+        if self.data.get(CONF_ENABLE_FLOWS):
+            flow_default = self.config_entry.options.get(
+                CONF_FLOW_COUNT, 
+                self.config_entry.data.get(CONF_FLOW_COUNT, DEFAULT_FLOW_COUNT)
+            )
+            fields[vol.Optional(CONF_FLOW_COUNT, default=flow_default)] = cv.positive_int
+        
+        if self.data.get(CONF_ENABLE_FLOWS):
+            total_flow_default = self.config_entry.options.get(
+                CONF_TOTAL_FLOW_COUNT, 
+                self.config_entry.data.get(CONF_TOTAL_FLOW_COUNT, DEFAULT_TOTAL_FLOW_COUNT)
+            )
+            fields[vol.Optional(CONF_TOTAL_FLOW_COUNT, default=total_flow_default)] = cv.positive_int
+        
+        # Only add alarm count if alarms were enabled in step 1
+        if self.data.get(CONF_ENABLE_ALARMS):
+            alarm_default = self.config_entry.options.get(
+                CONF_ALARM_COUNT, 
+                self.config_entry.data.get(CONF_ALARM_COUNT, DEFAULT_ALARM_COUNT)
+            )
+            fields[vol.Optional(CONF_ALARM_COUNT, default=alarm_default)] = cv.positive_int
+
+        return self.async_show_form(
+            step_id="counts",
+            data_schema=vol.Schema(fields),
+            description_placeholders={"message": "Configure limits for the enabled features."}
         )

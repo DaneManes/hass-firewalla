@@ -1,5 +1,7 @@
 """Device tracker platform for Firewalla."""
 import logging
+from datetime import datetime, timezone
+
 from homeassistant.components.device_tracker import SourceType, ScannerEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
@@ -7,7 +9,10 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN 
+from .const import (
+    DOMAIN,
+    ATTR_LAST_SEEN,
+    )
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -47,9 +52,15 @@ class FirewallaDeviceTracker(CoordinatorEntity, ScannerEntity):
         if coordinator.data.get("boxes"):
             box_id = coordinator.data["boxes"][0].get("id")
 
+        # self._attr_device_info = DeviceInfo(
+            # identifiers={(DOMAIN, f"box_{box_id}")},
+            # name="Firewalla Box",
+            # manufacturer="Firewalla",
+        # )
+        
         self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, f"box_{box_id}")},
-            name="Firewalla Box",
+            identifiers={(DOMAIN, self.device_id)},
+            name=device.get("name", f"Firewalla Device {self.device_id}"),
             manufacturer="Firewalla",
         )
 
@@ -82,6 +93,24 @@ class FirewallaDeviceTracker(CoordinatorEntity, ScannerEntity):
     def mac_address(self) -> str:
         """Return the pre-stored MAC address."""
         return self._mac
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        """Return device specific state attributes."""
+        device = self._get_device_data()
+        
+        # Safe conversion of lastSeen to avoid UnboundLocalError
+        lastseen_attr = None
+        last_active = device.get("lastSeen")
+        if last_active:
+            try:
+                lastseen_attr = datetime.fromtimestamp(float(last_active), tz=timezone.utc)
+            except (ValueError, TypeError):
+                lastseen_attr = None
+
+        return {
+            ATTR_LAST_SEEN: lastseen_attr,
+        }
 
     def _get_device_data(self) -> dict:
         """Helper to find this device in the latest coordinator data."""

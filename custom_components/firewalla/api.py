@@ -304,11 +304,15 @@ class FirewallaApiClient:
             _LOGGER.warning("Error getting rules (endpoint may not be available): %s", exc)
             return []
 
-    async def get_alarms(self) -> List[Dict[str, Any]]:
-        """Get all alarms from the API."""
+    async def get_alarms(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Get all alarms from the API with optional limit."""
+        params = {}
+        if limit:
+            # Pass the limit to the API as a query parameter
+            params["limit"] = limit
         try:
             # 1. Fetch the raw response
-            alarms_response = await self._api_request("GET", "alarms")
+            alarms_response = await self._api_request("GET", "alarms", params=params)
         
             if not alarms_response:
                 _LOGGER.warning("No alarms found or endpoint not available")
@@ -339,13 +343,17 @@ class FirewallaApiClient:
             _LOGGER.error("Error getting alarms: %s", exc)
             return []
 
-
-    async def get_flows(self) -> List[Dict[str, Any]]:
+    async def get_flows(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
         """Get all flows."""
         flows = []
+        params = {}
+        if limit:
+            # Pass the limit to the API as a query parameter
+            params["limit"] = limit
+
         try:
-            # Get the flows from the API
-            flows_response = await self._api_request("GET", "flows")
+            # Pass the params dictionary to your _api_request helper
+            flows_response = await self._api_request("GET", "flows", params=params)
             
             if not flows_response:
                 _LOGGER.warning("No flows found or endpoint not available")
@@ -373,6 +381,8 @@ class FirewallaApiClient:
                         src_id = flow.get("source", {}).get("id", "unknown")
                         dst_id = flow.get("destination", {}).get("id", "unknown")
                         ts = flow.get("ts", "")
+                        blocked = flow.get("block", "")
+                        port = flow.get("device", {}).get("port", "unknown")
                         flow["id"] = f"flow_{src_id}_{dst_id}_{ts}"
                 
                 processed_flows.append(flow)

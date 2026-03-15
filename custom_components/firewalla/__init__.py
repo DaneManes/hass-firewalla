@@ -1,5 +1,6 @@
 """The Firewalla integration."""
 from datetime import timedelta
+from functools import partial
 import logging
 
 from homeassistant.config_entries import ConfigEntry
@@ -18,6 +19,14 @@ from .const import (
     DEFAULT_SUBDOMAIN,
     DOMAIN,
     PLATFORMS,
+    CONF_ENABLE_FLOWS, 
+    CONF_ENABLE_RULES, 
+    CONF_ENABLE_ALARMS, 
+    CONF_TRACK_DEVICES,
+    CONF_ALARM_COUNT, 
+    DEFAULT_ALARM_COUNT,
+    CONF_TOTAL_FLOW_COUNT, 
+    DEFAULT_TOTAL_FLOW_COUNT,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -25,18 +34,21 @@ _LOGGER = logging.getLogger(__name__)
 # Define a dataclass for cleaner data access (Optional but recommended)
 class FirewallaData:
     """Class to hold Firewalla runtime data."""
-    def __init__(self, client, coordinator):
+    def __init__(self, client, coordinator, subdomain):
         self.client = client
         self.coordinator = coordinator
+        self.subdomain = subdomain
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Firewalla from a config entry."""
     session = async_get_clientsession(hass)
     
+    subdomain = entry.data.get(CONF_SUBDOMAIN, DEFAULT_SUBDOMAIN)
+    
     client = FirewallaApiClient(
         session=session,
         api_token=entry.data.get(CONF_API_TOKEN),
-        subdomain=entry.data.get(CONF_SUBDOMAIN, DEFAULT_SUBDOMAIN),
+        subdomain=subdomain,
     )
     
     if not await client.authenticate():
@@ -50,11 +62,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     async def async_update_data():
         """Fetch data from API based on user preferences."""
-        # Use local references to keys to avoid circular imports
-        from .const import (
-            CONF_ENABLE_FLOWS, CONF_ENABLE_RULES, 
-            CONF_ENABLE_ALARMS, CONF_TRACK_DEVICES
-        )
+        # # Use local references to keys to avoid circular imports
+        # from .const import (
+            # CONF_ENABLE_FLOWS, CONF_ENABLE_RULES, 
+            # CONF_ENABLE_ALARMS, CONF_TRACK_DEVICES,
+            # CONF_ALARM_COUNT, DEFAULT_ALARM_COUNT,
+            # CONF_TOTAL_FLOW_COUNT, DEFAULT_TOTAL_FLOW_COUNT,
+        # )
         
         opts = entry.options
         # Helper to check if a feature is enabled in options or data
@@ -68,11 +82,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             # Conditional fetching with error protection per-call
             results = {"rules": [], "alarms": [], "flows": []}
             
+            # set return limits
+            total_flow_limit = opts.get(CONF_TOTAL_FLOW_COUNT, entry.data.get(CONF_TOTAL_FLOW_COUNT, DEFAULT_TOTAL_FLOW_COUNT))
+            alarm_limit = opts.get(CONF_ALARM_COUNT, entry.data.get(CONF_ALARM_COUNT, DEFAULT_ALARM_COUNT))
+            
             # Map calls to their config keys
             calls = [
                 ("rules", is_enabled(CONF_ENABLE_RULES), client.get_rules),
-                ("alarms", is_enabled(CONF_ENABLE_ALARMS), client.get_alarms),
-                ("flows", is_enabled(CONF_ENABLE_FLOWS), client.get_flows),
+                ("alarms", is_enabled(CONF_ENABLE_ALARMS), partial(client.get_alarms, limit=alarm_limit)),
+                ("flows", is_enabled(CONF_ENABLE_FLOWS), partial(client.get_flows, limit=total_flow_limit)),
             ]
 
             for key, enabled, func in calls:
@@ -114,8 +132,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await coordinator.async_config_entry_first_refresh()
 
-    # MODERN WAY: Store in runtime_data
-    entry.runtime_data = FirewallaData(client, coordinator)
+    entry.runtime_data = FirewallaData(client, coordinator, subdomain)
     
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(async_update_options))
