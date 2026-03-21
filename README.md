@@ -38,6 +38,11 @@ This integration allows you to monitor and control your Firewalla devices from H
 5. Enter your Firewalla API token
    - To get your API token, go to your Firewalla MSP account > Account Settings > Create New Token
 
+## Branding
+
+As of HA 2026.3 the custom integration branding finally works again. You will find appropriate icon files
+in the /brand directory where you can (manually, sorry) rename the icon of your choice to match your Firewalla model.
+
 ## Changes to original code
 
 1. The integration no longer creates separate entities for both alarms and rules. They are now blobbed and need a template to display.
